@@ -83,33 +83,35 @@ Every head of a node should be on of `truth-table-allowed-functions'"
          (function (truth-table-generate-function variables expression))
          (inputs (truth-table-generate-inputs variables-count)))
     (cons
-     (list variables expression)
-     (mapcar (lambda (values)
-               (list values (apply function values)))
-             inputs))))
+     (append variables (list expression))
+     (mapcar
+      (lambda (values)
+        (append values (list (apply function values))))
+      inputs))))
 
 ;; (truth-table-generate '(and a (or b c)))
 
-(defun truth-table-generate-plot-string (truth-table)
-  "Return plot string based on `TRUTH-TABLE'."
-  (let ((result ""))
-    (dolist (line truth-table)
-      (dolist (var (cl-first line))
-        (setq result (format "%s%4s |" result var)))
-      (setq result (format "%s %s\n" result (cl-second line))))
-    result))
-
-;; (truth-table-generate-plot-string (truth-table-generate '(and a (or b c))))
-
 (defun truth-table (expression)
   "Generate a truth table from a Lisp boolean `EXPRESSION'."
-  (interactive "xeLisp expression: ")
-  (let* ((truth-table-alist (truth-table-generate expression))
-         (truth-table-string (truth-table-generate-plot-string
-                              truth-table-alist)))
+  (interactive "xLisp expression: ")
+  (let* ((truth-table-list (truth-table-generate expression)))
     (pop-to-buffer truth-table-buffer-name)
-    (erase-buffer)
-    (insert truth-table-string)))
+    (tabulated-list-mode)
+    (cl-destructuring-bind (format . entries)
+        truth-table-list
+      (setq tabulated-list-format
+            (map 'vector (lambda (item)
+                           (let ((s (format "%s" item)))
+                             (list s (max 5 (1+ (length s))) t)))
+                 format)
+
+            tabulated-list-entries
+            (mapcar (lambda (item)
+                      (list nil (map 'vector #'symbol-name item)))
+                    entries)))
+
+    (tabulated-list-init-header)
+    (tabulated-list-print)))
 
 (provide 'truth-table)
 ;;; truth-table.el ends here
