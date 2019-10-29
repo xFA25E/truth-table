@@ -1,4 +1,4 @@
-;;; truth-tables.el --- Generate truth tables        -*- lexical-binding: t; -*-
+;;; truth-table.el --- Generate truth tables        -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2019
 
@@ -111,5 +111,5 @@ Every head of a node should be on of `truth-table-allowed-functions'"
     (erase-buffer)
     (insert truth-table-string)))
 
-(provide 'truth-tables)
-;;; truth-tables.el ends here
+(provide 'truth-table)
+;;; truth-table.el ends here
