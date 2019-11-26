@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019
 
-;; Author:  <>
+;; Author:  <xFA25E>
 ;; Keywords: games
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -32,21 +32,28 @@
 (defvar truth-table-buffer-name
   "*Truth Table*")
 
-(defun truth-table-extract-variables (expression)
-  "Extract variables from `EXPRESSION'."
-  (let (variables)
-    (dolist (item (cl-rest expression))
-      (if (listp item)
-          (dolist (item (truth-table-extract-variables item))
-            (cl-pushnew item variables))
-        (cl-pushnew item variables)))
-    (cl-sort variables #'string-lessp :key #'symbol-name)))
+(defun truth-table-extract-variables (subexpressions)
+  "Extract variables from `SUBEXPRESSIONS'."
+  (cl-remove-if #'listp subexpressions))
 
-;; (truth-table-extract-variables '(and a (or b c) (not (and w t (or t c b)))))
+;; (truth-table-extract-variables '((and a (or b c) (not (and w s (or s c b)))) a (or b c) (not (and w s (or s c b))) (and w s (or s c b)) w (or s c b) s c b))
+;; => (a b c s w)
+
+(defun truth-table-extract-subexpressions (expression)
+  "Extract subexpressions from `EXPRESSION'."
+  (if (listp expression)
+      (cl-loop for item in (cl-rest expression)
+               nconc (truth-table-extract-subexpressions item) into result
+               finally return (cl-delete-duplicates (cons expression result)
+                                                    :test #'equal))
+    (list expression)))
+
+;; (truth-table-extract-subexpressions '(and a (or b c) (not (and w s (or s c b)))))
+;; => ((and a (or b c) (not (and w s (or s c b)))) a (or b c) (not (and w s (or s c b))) (and w s (or s c b)) w (or s c b) s c b)
 
 (defun truth-table-valid-expression-p (expression)
   "Return t if `EXPRESSION' contain a valid expression.
-Every head of a node should be on of `truth-table-allowed-functions'"
+Every head of a node should be in of `truth-table-allowed-functions'"
   (cl-destructuring-bind (first &rest rest) expression
     (and (memq first truth-table-allowed-functions)
          (cl-loop for item in rest
@@ -56,21 +63,23 @@ Every head of a node should be on of `truth-table-allowed-functions'"
                   finally return t))))
 
 ;; (truth-table-valid-expression-p '(and a (or b c) (not (and w t (or t c b)))))
+;; => t
 
-(defun truth-table-generate-function (variables expression)
-  "Create a function based on `VARIABLES' and a boolean `EXPRESSION'."
-  (eval `(lambda ,variables ,expression)))
+(defun truth-table-generate-function (variables subexpressions)
+  "Create a function based on `VARIABLES' and a boolean `SUBEXPRESSIONS'."
+  (eval `(lambda ,variables
+           (flet ((and (&rest args) (if (cl-find 0 args) 0 1))
+                  (or (&rest args) (if (cl-find 1 args) 1 0))
+                  (not (arg) (if (zerop arg) 1 0)))
+             (list ,@subexpressions)))))
 
 (defun truth-table-generate-inputs (count)
   "Generate `COUNT' permutations of booleans."
-  (if (= 1 count)
-      (list (list nil) (list t))
-    (mapcan
-     (lambda (item)
-       (mapcar (lambda (next-item)
-                 (cons item next-item))
-               (truth-table-generate-inputs (1- count))))
-     (list nil t))))
+  (cl-loop repeat count
+           for result = (list (list 0) (list 1))
+           then (cl-loop for seq in result
+                         nconc (list (cons 0 seq) (cons 1 seq)))
+           finally return result))
 
 (defun truth-table-generate (expression)
   "Generate truth table alist from `EXPRESSION'."
@@ -78,18 +87,15 @@ Every head of a node should be on of `truth-table-allowed-functions'"
   (unless (truth-table-valid-expression-p expression)
     (error "%S is not a valid expression!" expression))
 
-  (let* ((variables (truth-table-extract-variables expression))
-         (variables-count (length variables))
-         (function (truth-table-generate-function variables expression))
-         (inputs (truth-table-generate-inputs variables-count)))
-    (cons
-     (append variables (list expression))
-     (mapcar
-      (lambda (values)
-        (append values (list (apply function values))))
-      inputs))))
+  (let* ((subexps (nreverse (truth-table-extract-subexpressions expression)))
+         (vars (truth-table-extract-variables subexps))
+         (vars-count (length vars))
+         (func (truth-table-generate-function vars subexps))
+         (inputs (truth-table-generate-inputs vars-count)))
+    (cons subexps (mapcar (lambda (values) (apply func values)) inputs))))
 
 ;; (truth-table-generate '(and a (or b c)))
+;; => ((c b (or b c) a (and a (or b c))) (0 0 0 0 0) (1 0 1 0 0) (0 1 1 0 0) (1 1 1 0 0) (0 0 0 1 0) (1 0 1 1 1) (0 1 1 1 1) (1 1 1 1 1))
 
 (defun truth-table (expression)
   "Generate a truth table from a Lisp boolean `EXPRESSION'."
@@ -97,18 +103,24 @@ Every head of a node should be on of `truth-table-allowed-functions'"
   (let* ((truth-table-list (truth-table-generate expression)))
     (pop-to-buffer truth-table-buffer-name)
     (tabulated-list-mode)
-    (cl-destructuring-bind (format . entries)
-        truth-table-list
-      (setq tabulated-list-format
-            (map 'vector (lambda (item)
-                           (let ((s (format "%s" item)))
-                             (list s (max 5 (1+ (length s))) t)))
-                 format)
-
-            tabulated-list-entries
-            (mapcar (lambda (item)
-                      (list nil (map 'vector #'symbol-name item)))
-                    entries)))
+    (cl-destructuring-bind (format . entries) truth-table-list
+      (let ((spaces (list)))
+        (setq tabulated-list-format
+              (map 'vector
+                   (lambda (item)
+                     (let* ((s (format "%s" item))
+                            (l (length s)))
+                       (setq spaces (cons (cl-loop repeat (/ l 2) concat " ")
+                                          spaces))
+                       (list s l t)))
+                   format))
+        (setq spaces (nreverse spaces))
+        (setq tabulated-list-entries
+              (map 'list
+                   (lambda (item)
+                     (list nil (map 'vector (lambda (n s) (format "%s%d" s n))
+                                    item spaces)))
+                   entries))))
 
     (tabulated-list-init-header)
     (tabulated-list-print)))
