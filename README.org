@@ -2,3 +2,16 @@
 
 Simple emacs package that generates truth tables out of given expression.
 Just ~M-x truth-table~ and write boolean expression with =and=, =or= or =not=
+* Example
+  ~M-x truth-table RET (and a b (not c) (or a b)) RET~
+
+  | b | a | (or a b) | c | (not c) | (and a b (not c) (or a b)) |
+  |---+---+----------+---+---------+----------------------------|
+  | 0 | 0 |        0 | 0 |       1 |                          0 |
+  | 1 | 0 |        1 | 0 |       1 |                          0 |
+  | 0 | 1 |        1 | 0 |       1 |                          0 |
+  | 1 | 1 |        1 | 0 |       1 |                          1 |
+  | 0 | 0 |        0 | 1 |       0 |                          0 |
+  | 1 | 0 |        1 | 1 |       0 |                          0 |
+  | 0 | 1 |        1 | 1 |       0 |                          0 |
+  | 1 | 1 |        1 | 1 |       0 |                          0 |
