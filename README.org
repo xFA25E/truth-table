@@ -1,4 +1,4 @@
 #+TITLE: Truth Table
 
 Simple emacs package that generates truth tables out of given expression.
-Just ~M-x truth-table~
+Just ~M-x truth-table~ and write boolean expression with =and=, =or= or =not=
