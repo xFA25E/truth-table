@@ -68,9 +68,9 @@ Every head of a node should be in of `truth-table-allowed-functions'"
 (defun truth-table-generate-function (variables subexpressions)
   "Create a function based on `VARIABLES' and a boolean `SUBEXPRESSIONS'."
   (eval `(lambda ,variables
-           (flet ((and (&rest args) (if (cl-find 0 args) 0 1))
-                  (or (&rest args) (if (cl-find 1 args) 1 0))
-                  (not (arg) (if (zerop arg) 1 0)))
+           (cl-letf (((symbol-function 'and) (lambda (&rest args) (if (cl-find 0 args) 0 1)))
+                     ((symbol-function 'or) (lambda (&rest args) (if (cl-find 1 args) 1 0)))
+                     ((symbol-function 'not) (lambda (arg) (if (zerop arg) 1 0))))
              (list ,@subexpressions)))))
 
 (defun truth-table-generate-inputs (count)
@@ -106,21 +106,21 @@ Every head of a node should be in of `truth-table-allowed-functions'"
     (cl-destructuring-bind (format . entries) truth-table-list
       (let ((spaces (list)))
         (setq tabulated-list-format
-              (map 'vector
-                   (lambda (item)
-                     (let* ((s (format "%s" item))
-                            (l (length s)))
-                       (setq spaces (cons (cl-loop repeat (/ l 2) concat " ")
-                                          spaces))
-                       (list s l t)))
-                   format))
+              (cl-map 'vector
+                      (lambda (item)
+                        (let* ((s (format "%s" item))
+                               (l (length s)))
+                          (setq spaces (cons (cl-loop repeat (/ l 2) concat " ")
+                                             spaces))
+                          (list s l t)))
+                      format))
         (setq spaces (nreverse spaces))
         (setq tabulated-list-entries
-              (map 'list
-                   (lambda (item)
-                     (list nil (map 'vector (lambda (n s) (format "%s%d" s n))
-                                    item spaces)))
-                   entries))))
+              (cl-map 'list
+                      (lambda (item)
+                        (list nil (cl-map 'vector (lambda (n s) (format "%s%d" s n))
+                                          item spaces)))
+                      entries))))
 
     (tabulated-list-init-header)
     (tabulated-list-print)))
